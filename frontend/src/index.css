@@ -1,0 +1,145 @@
+/* --- GLOBAL RESET & TYPOGRAPHY --- */
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #f3f4f6; /* Soft, modern light gray background */
+  color: #1f2937; /* Dark slate text for readability */
+  -webkit-font-smoothing: antialiased;
+}
+
+h2, h3 {
+  margin-top: 0;
+  color: #111827;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+/* --- THE "CARD" SYSTEM --- */
+/* This makes sections look like floating white boxes (like real apps use) */
+.glass-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  padding: 30px;
+  margin-bottom: 20px;
+  border: 1px solid #e5e7eb;
+}
+
+/* --- MODERN INPUT BOXES --- */
+input, select {
+  width: 100%;
+  padding: 14px;
+  margin-bottom: 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 16px;
+  box-sizing: border-box; /* Keeps them from overflowing */
+  transition: border-color 0.2s ease;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: #000000; /* Uber-style black border when clicking */
+}
+
+/* --- SLEEK BUTTONS --- */
+.btn {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 10px;
+}
+
+/* Specific Button Colors */
+.btn-black { background-color: #000000; color: white; }
+.btn-black:hover { background-color: #374151; transform: translateY(-2px); }
+
+.btn-green { background-color: #10b981; color: white; }
+.btn-green:hover { background-color: #059669; transform: translateY(-2px); }
+
+.btn-blue { background-color: #3b82f6; color: white; }
+.btn-blue:hover { background-color: #2563eb; transform: translateY(-2px); }
+
+.btn-outline { background-color: transparent; color: #000; border: 2px solid #000; }
+.btn-outline:hover { background-color: #f3f4f6; }
+/* =========================================
+   ✨ THE ANIMATION ENGINE ✨
+========================================= */
+
+/* 1. The Fade & Slide Up (Used for page loading) */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: fadeSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0; /* Starts hidden before the animation kicks in */
+}
+
+/* Stagger Delays: Makes elements load one after the other! */
+.delay-1 { animation-delay: 0.1s; }
+.delay-2 { animation-delay: 0.2s; }
+.delay-3 { animation-delay: 0.3s; }
+
+/* 2. The Pop-In (Used for the Delete Modal) */
+@keyframes popIn {
+  0% { opacity: 0; transform: scale(0.9); }
+  50% { transform: scale(1.02); } /* Slight bounce effect */
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-pop {
+  animation: popIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 3. The Hover Lift (Make cards feel alive when moused over!) */
+.glass-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.glass-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+/* =========================================
+   🚕 THE DRIVING TAXI ANIMATION 🚕
+========================================= */
+
+/* 1. Moves the car from off-screen left to off-screen right */
+@keyframes driveAcross {
+  0% { transform: translateX(110vw); }
+  100% { transform: translateX(-20vw); }
+}
+
+/* 2. Makes the car bounce up and down slightly like a real suspension */
+@keyframes bumpyRoad {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.driving-taxi-container {
+  position: fixed;
+  bottom: 20px; /* Drives along the bottom of the screen */
+  left: 0;
+  font-size: 45px; /* Size of the car */
+  animation: driveAcross 18s linear infinite; /* Takes 18 seconds to cross the screen */
+  z-index: 100; /* Stays behind modals but over the background */
+  pointer-events: none; /* IMPORTANT: Prevents the car from blocking your clicks! */
+  display: flex;
+}
+
+.taxi-emoji {
+  animation: bumpyRoad 0.4s infinite; /* Fast, subtle bouncing */
+}
+
+.exhaust-fumes {
+  font-size: 25px;
+  margin-top: 15px;
+  opacity: 0.5;
+}
