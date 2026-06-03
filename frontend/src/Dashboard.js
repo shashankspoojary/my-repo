@@ -641,6 +641,24 @@ function Dashboard() {
                   </div>
                 )}
 
+                {/* Vehicle Type (e.g. Car, Auto, Bike) */}
+                {activeRideDetail.driver.vehicleType && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <p style={{ margin: '0 0 6px 0', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.65 }}>
+                      Vehicle Type
+                    </p>
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '8px',
+                      backgroundColor: 'rgba(251,191,36,0.12)', color: '#fbbf24',
+                      padding: '7px 16px', borderRadius: '10px',
+                      fontWeight: '700', fontSize: '15px', letterSpacing: '0.5px',
+                      border: '1.5px solid rgba(251,191,36,0.45)',
+                    }}>
+                      🚗 {activeRideDetail.driver.vehicleType}
+                    </div>
+                  </div>
+                )}
+
                 {/* Vehicle Registration Number (vehicleNumber field) */}
                 {activeRideDetail.driver.vehicleNumber && (
                   <div style={{ marginBottom: '12px' }}>
