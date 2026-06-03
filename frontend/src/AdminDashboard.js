@@ -86,7 +86,26 @@ function AdminDashboard() {
     fetchDrivers();
   };
 
-  // ── Reusable user-card renderer ────────────────────────────────────────────
+  // ── Toggle driver approval ─────────────────────────────────────────────────
+  const handleToggleApproval = async (driverId) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await axios.put(
+        `${process.env.REACT_APP_API_URL}/admin/drivers/${driverId}/approve`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Update the driver in local state so the UI responds instantly
+      setDrivers(prev =>
+        prev.map(d => d._id === driverId ? { ...d, isApproved: res.data.driver.isApproved } : d)
+      );
+    } catch (error) {
+      console.error('Failed to toggle driver approval', error);
+      alert('❌ Could not update approval status. Please try again.');
+    }
+  };
+
   const renderUserCard = (user, role) => (
     <div
       key={user._id}
@@ -117,19 +136,73 @@ function AdminDashboard() {
       <p style={{ margin: '0 0 5px 0',  fontSize: '13px', color: '#4b5563' }}>✉️ {user.email}</p>
       <p style={{ margin: '0 0 15px 0', fontSize: '13px', color: '#4b5563' }}>📱 +91 {user.phone}</p>
       {role === 'driver' && (
-        <div style={{
-          backgroundColor: '#f9fafb', padding: '12px', borderRadius: '8px',
-          border: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-        }}>
-          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#4b5563' }}>Global Rating:</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <span style={{ color: '#f59e0b', fontSize: '18px' }}>⭐</span>
-            <span style={{ fontWeight: 'bold', fontSize: '16px' }}>
-              {user.averageRating ? user.averageRating.toFixed(1) : '5.0'}
-            </span>
-            <span style={{ fontSize: '11px', color: '#6b7280' }}>({user.totalRatings || 0})</span>
+        <>
+          {/* ── Vehicle Reg Number ───────────────────────────────────── */}
+          {user.vehicleNumber && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              backgroundColor: '#1c1917', color: '#fbbf24',
+              padding: '6px 14px', borderRadius: '8px',
+              fontWeight: '800', fontSize: '15px', letterSpacing: '2px',
+              marginBottom: '8px', border: '2px solid #fbbf24'
+            }}>
+              🔢 {user.vehicleNumber}
+            </div>
+          )}
+
+          {/* ── Vehicle Type ─────────────────────────────────────────── */}
+          {user.vehicleType && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              backgroundColor: '#ede9fe', color: '#6d28d9',
+              padding: '4px 12px', borderRadius: '20px',
+              fontWeight: '700', fontSize: '13px',
+              marginBottom: '12px', marginLeft: '8px',
+              border: '1.5px solid #c4b5fd'
+            }}>
+              🚗 {user.vehicleType}
+            </div>
+          )}
+
+          {/* ── Rating row ───────────────────────────────────────────── */}
+          <div style={{
+            backgroundColor: '#f9fafb', padding: '12px', borderRadius: '8px',
+            border: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            marginBottom: '12px'
+          }}>
+            <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#4b5563' }}>Global Rating:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ color: '#f59e0b', fontSize: '18px' }}>⭐</span>
+              <span style={{ fontWeight: 'bold', fontSize: '16px' }}>
+                {user.averageRating ? user.averageRating.toFixed(1) : '5.0'}
+              </span>
+              <span style={{ fontSize: '11px', color: '#6b7280' }}>({user.totalRatings || 0})</span>
+            </div>
           </div>
-        </div>
+
+          {/* ── Approval toggle button ───────────────────────────────── */}
+          <button
+            id={`approve-driver-${user._id}`}
+            onClick={() => handleToggleApproval(user._id)}
+            style={{
+              width: '100%',
+              padding: '10px 16px',
+              borderRadius: '10px',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: '700',
+              fontSize: '14px',
+              transition: 'all 0.2s',
+              backgroundColor: user.isApproved ? '#d1fae5' : '#fef3c7',
+              color:           user.isApproved ? '#065f46' : '#92400e',
+              boxShadow:       user.isApproved
+                ? '0 0 0 2px #10b981 inset'
+                : '0 0 0 2px #f59e0b inset',
+            }}
+          >
+            {user.isApproved ? '✅ Approved — Click to Revoke' : '⏳ Pending — Click to Approve'}
+          </button>
+        </>
       )}
     </div>
   );

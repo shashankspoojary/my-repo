@@ -20,6 +20,7 @@ function Dashboard() {
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [numberOfTravelers, setNumberOfTravelers] = useState(1);
   const [vehicleType, setVehicleType] = useState('Car');
+  const [timeError, setTimeError] = useState('');   // ← 5-min buffer validation
   const navigate = useNavigate();
 
   const [pickupCoords, setPickupCoords] = useState(null);
@@ -124,6 +125,38 @@ function Dashboard() {
     }, () => {
       setMessage("❌ Permission denied. Please enable location.");
     });
+  };
+
+  // ── 5-Minute Booking Buffer Helpers ──────────────────────────────────────────
+
+  /**
+   * Returns the datetime-local string for (now + 5 minutes).
+   * Used as both the `min` attribute and the validation threshold.
+   */
+  const getMinDateTime = () => {
+    const d = new Date(Date.now() + 5 * 60 * 1000);
+    // Format: YYYY-MM-DDTHH:MM  (no seconds — matches datetime-local value)
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  /**
+   * Validates the selected datetime whenever the user changes the picker.
+   * Sets timeError if the chosen time is < now + 5 minutes.
+   */
+  const handleTimeChange = (e) => {
+    const selected = e.target.value;
+    setScheduledFor(selected);
+
+    if (!selected) { setTimeError(''); return; }
+
+    const selectedMs  = new Date(selected).getTime();
+    const minAllowed  = Date.now() + 5 * 60 * 1000;
+    if (selectedMs < minAllowed) {
+      setTimeError('❌ Bookings must be scheduled at least 5 minutes in advance.');
+    } else {
+      setTimeError('');
+    }
   };
 
   const handleAddStop = () => setStops([...stops, '']);
@@ -276,6 +309,14 @@ function Dashboard() {
 
     if (!scheduledFor) {
       return setMessage('⚠️ Please select a Date and Time for your pickup before booking.');
+    }
+
+    // ── 5-Minute Buffer Check (guard against keyboard/programmatic submission) ──
+    const selectedMs = new Date(scheduledFor).getTime();
+    const minAllowed = Date.now() + 5 * 60 * 1000;
+    if (selectedMs < minAllowed) {
+      setTimeError('❌ Bookings must be scheduled at least 5 minutes in advance.');
+      return;
     }
 
     // ── ONLINE PAYMENT: run Razorpay checkout BEFORE creating the ride ──
@@ -600,6 +641,26 @@ function Dashboard() {
                   </div>
                 )}
 
+                {/* Vehicle Registration Number (vehicleNumber field) */}
+                {activeRideDetail.driver.vehicleNumber && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <p style={{ margin: '0 0 6px 0', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.65 }}>
+                      Vehicle Licence Number
+                    </p>
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '8px',
+                      backgroundColor: '#1c1917', color: '#fbbf24',
+                      padding: '8px 18px', borderRadius: '10px',
+                      fontWeight: '900', fontSize: '17px', letterSpacing: '3px',
+                      border: '2px solid #fbbf24',
+                      boxShadow: '0 2px 12px rgba(251,191,36,0.25)'
+                    }}>
+                      🪪 {activeRideDetail.driver.vehicleNumber}
+                    </div>
+                  </div>
+                )}
+
+
                 {/* Phone number — tap to call */}
                 {activeRideDetail.driver.phone && (
                   <a
@@ -744,14 +805,24 @@ function Dashboard() {
               ))}
             </div>
 
-            {/* Date & Time Picker — min set to today to block past dates */}
+            {/* Date & Time Picker — min enforces now+5 min to block past/near times */}
             <label style={{ fontSize: '13px', fontWeight: '600', color: '#374151', margin: '4px 0 2px 2px' }}>📅 Pickup Date & Time</label>
             <input
               type="datetime-local"
               value={scheduledFor}
-              onChange={(e) => setScheduledFor(e.target.value)}
-              min={`${new Date().toISOString().split('T')[0]}T00:00`}
+              onChange={handleTimeChange}
+              min={getMinDateTime()}
             />
+            {timeError && (
+              <p style={{
+                margin: '4px 0 8px 2px',
+                fontSize: '13px',
+                fontWeight: '600',
+                color: '#dc2626',
+              }}>
+                {timeError}
+              </p>
+            )}
 
             <button type="submit" className="btn btn-blue">🌍 Drop Pins on Map</button>
           </form>

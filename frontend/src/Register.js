@@ -7,8 +7,10 @@ function Register() {
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [phone,    setPhone]    = useState('');
-  const [role,     setRole]     = useState('rider');
-  const [message,  setMessage]  = useState('');
+  const [role,          setRole]          = useState('rider');
+  const [vehicleNumber, setVehicleNumber] = useState('');
+  const [vehicleType,   setVehicleType]   = useState('Car');
+  const [message,       setMessage]       = useState('');
 
   const navigate = useNavigate();
 
@@ -21,13 +23,13 @@ function Register() {
     }
 
     try {
-      await axios.post(`${process.env.REACT_APP_API_URL}/auth/register`, {
-        username,
-        email,
-        password,
-        phone,
-        role
-      });
+      const payload = { username, email, password, phone, role };
+      if (role === 'driver') {
+        payload.vehicleNumber = vehicleNumber;
+        payload.vehicleType   = vehicleType;
+      }
+
+      await axios.post(`${process.env.REACT_APP_API_URL}/auth/register`, payload);
 
       setMessage('✅ Account Created! Sending you to Login...');
       setTimeout(() => navigate('/login'), 1500);
@@ -77,10 +79,33 @@ function Register() {
             required
           />
 
-          <select value={role} onChange={(e) => setRole(e.target.value)}>
+          <select value={role} onChange={(e) => { setRole(e.target.value); setVehicleNumber(''); setVehicleType('Car'); }}>
             <option value="rider">I am a Rider 🚕</option>
             <option value="driver">I am a Driver 🚗</option>
           </select>
+
+          {role === 'driver' && (
+            <>
+              <input
+                type="text"
+                placeholder="Vehicle Registration Number (e.g. MH12AB1234)"
+                value={vehicleNumber}
+                onChange={(e) => setVehicleNumber(e.target.value)}
+                required
+              />
+
+              <select
+                value={vehicleType}
+                onChange={(e) => setVehicleType(e.target.value)}
+                required
+              >
+                <option value="Car">Car 🚗</option>
+                <option value="Auto">Auto 🛺</option>
+                <option value="Bike">Bike 🏍️</option>
+                <option value="Other">Other 🚐</option>
+              </select>
+            </>
+          )}
 
           <button type="submit" className="btn btn-green">
             Sign Up

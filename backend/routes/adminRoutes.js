@@ -161,4 +161,31 @@ router.get('/drivers', protect, adminOnly, async (req, res) => {
     }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PROTECTED: PUT /admin/drivers/:id/approve
+// Toggles the isApproved flag of a driver.
+// Returns the updated driver document (without password).
+// ─────────────────────────────────────────────────────────────────────────────
+router.put('/drivers/:id/approve', protect, adminOnly, async (req, res) => {
+    try {
+        const driver = await Driver.findById(req.params.id).select('-password');
+        if (!driver) {
+            return res.status(404).json({ message: 'Driver not found.' });
+        }
+
+        // Toggle the approval state
+        driver.isApproved = !driver.isApproved;
+        await driver.save();
+
+        const statusLabel = driver.isApproved ? '✅ approved' : '🚫 revoked';
+        res.status(200).json({
+            message: `Driver ${driver.username} has been ${statusLabel}.`,
+            driver
+        });
+    } catch (error) {
+        console.error('🚨 ERROR toggling driver approval:', error);
+        res.status(500).json({ message: 'Server error toggling driver approval.' });
+    }
+});
+
 module.exports = router;

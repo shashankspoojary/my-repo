@@ -26,7 +26,7 @@ function modelForRole(role) {
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/register', async (req, res) => {
     try {
-        const { username, email, password, phone, role } = req.body;
+        const { username, email, password, phone, role, vehicleNumber, vehicleType } = req.body;
 
         // 1. Role guard — only riders and drivers can self-register
         if (!role || !['rider', 'driver'].includes(role)) {
@@ -71,7 +71,13 @@ router.post('/register', async (req, res) => {
         }
 
         // 8. Create and persist the new document
-        const newAccount = new Model({ username, email, password, phone });
+        const newAccount = new Model({
+            username,
+            email,
+            password,
+            phone,
+            ...(role === 'driver' && { vehicleNumber, vehicleType })
+        });
         await newAccount.save();
 
         res.status(201).json({

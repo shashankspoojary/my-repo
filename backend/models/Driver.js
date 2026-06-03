@@ -28,6 +28,21 @@ const driverSchema = new mongoose.Schema({
     password: { type: String, required: [true, 'Password is required.'] },
     phone:    { type: String, required: [true, 'Phone number is required.'] },
 
+    // Phase 4: Admin-controlled approval gate
+    vehicleNumber: {
+        type: String,
+        required: [true, 'Vehicle registration number is required.'],
+        trim: true,
+        uppercase: true
+    },
+    vehicleType: {
+        type: String,
+        enum: ['Car', 'Auto', 'Bike', 'Other'],
+        required: [true, 'Vehicle type is required.'],
+        default: 'Car'
+    },
+    isApproved: { type: Boolean, default: false },
+
     // Vehicle information (driver-specific)
     vehicle: {
         make:         { type: String },

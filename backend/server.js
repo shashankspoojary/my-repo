@@ -27,7 +27,31 @@ const io = new Server(server, {
 app.set('io', io);
 
 io.on('connection', (socket) => {
-    console.log('⚡ A user connected to the live feed!');
+    console.log(`⚡ Socket connected: ${socket.id}`);
+
+    // Drivers call this right after connecting so we can target them individually
+    socket.on('registerDriver', (driverId) => {
+        socket.data.driverId = driverId;
+        console.log(`🚗 Driver registered on socket: driverId=${driverId}`);
+    });
+
+    // Drivers declare their vehicle type so broadcasts can be scoped to the correct room
+    socket.on('joinVehicleRoom', (data) => {
+        console.log(`SOCKET JOIN EVENT - Socket ID: ${socket.id}, Vehicle Type: ${data ? data.vehicleType : 'MISSING DATA'}`);
+        if (data && data.vehicleType) {
+            // Trim whitespace but preserve original casing ('Car', 'Auto', 'Bike')
+            // so the room name matches exactly what the /book route emits to
+            const sanitizedType = data.vehicleType.trim();
+            socket.join(`vehicle_${sanitizedType}`);
+            console.log(`🚘 Driver socket ${socket.id} joined room: vehicle_${sanitizedType}`);
+        } else {
+            console.warn(`⚠️  joinVehicleRoom received empty/invalid data from socket ${socket.id}:`, data);
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log(`🔌 Socket disconnected: ${socket.id}`);
+    });
 });
 
 // 3. MIDDLEWARE

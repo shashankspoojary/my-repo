@@ -14,6 +14,9 @@ function DriverDashboard() {
   const [rides, setRides] = useState([]);
   const [activeJobs, setActiveJobs] = useState([]);
   const [message, setMessage] = useState('');
+
+  // Holds the driver's full profile once fetched; used to gate the vehicle-room join
+  const [driverProfile, setDriverProfile] = useState(null);
   
   // State to hold the driver's earnings and stats
   const [stats, setStats] = useState({ totalRides: 0, activeRides: 0, totalEarnings: 0 });
@@ -30,35 +33,111 @@ function DriverDashboard() {
 
   const navigate = useNavigate();
 
+  // ── Effect 1: Socket lifecycle (runs once on mount) ─────────────────────────
+  // Sets up the persistent socket connection, registers the driver ID, and
+  // fetches the driver profile to populate `driverProfile` state.
   useEffect(() => {
     fetchAvailableRides();
     fetchMyJobs();
-    fetchDriverStats(); 
-    
+    fetchDriverStats();
+
+    // Decode the JWT to extract the user's ID for driver registration
+    const token = localStorage.getItem('token');
+    let driverId = null;
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        driverId = payload.userId || payload.id || payload._id;
+      } catch (e) {
+        console.error('Failed to decode token for socket registration', e);
+      }
+    }
+
     const socket = io(process.env.REACT_APP_API_URL.replace('/api', ''));
-    
-    socket.on('newRideAlert', () => {
-      fetchAvailableRides();
-      setLiveAlert("📡 New passenger request available!");
+
+    // Expose socket instance on window so Effect 2 can reference it for re-joins
+    window._driverSocket = socket;
+
+    // Register this driver's ID so the server can target only approved drivers
+    if (driverId) {
+      socket.emit('registerDriver', driverId);
+    }
+
+    // Fetch driver profile once connected and store in state.
+    // Effect 2 watches `driverProfile` and handles the actual room join,
+    // so the join is safely retried if the profile fetch previously failed.
+    socket.on('connect', async () => {
+      try {
+        const res = await axios.get(`${process.env.REACT_APP_API_URL}/auth/profile`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        // The /auth/profile endpoint returns a flat object: { vehicleType, ... }
+        const profile = res.data;
+        if (profile && (profile.vehicleType || profile?.driver?.vehicleType)) {
+          // Normalise: prefer top-level vehicleType, fall back to nested driver object
+          const resolvedVehicleType = profile.vehicleType || profile.driver.vehicleType;
+          setDriverProfile({ ...profile, vehicleType: resolvedVehicleType });
+          console.log('✅ Driver profile loaded, vehicleType:', resolvedVehicleType);
+        } else {
+          console.warn('⚠️ Driver profile fetched but vehicleType is missing:', profile);
+        }
+      } catch (e) {
+        console.error('Failed to fetch driver profile for vehicle room join', e);
+      }
+    });
+
+    // 🚗 Optimistically prepend the incoming ride without a re-fetch
+    socket.on('newRideRequest', (newRide) => {
+      setRides(prevRides => {
+        // Guard against duplicates if the same event fires twice
+        const alreadyExists = prevRides.some(r => r._id === newRide._id);
+        if (alreadyExists) return prevRides;
+        return [newRide, ...prevRides];
+      });
+      setLiveAlert('📡 New passenger request available!');
       setTimeout(() => setLiveAlert(null), 5000);
     });
 
     socket.on('rideUpdated', () => {
       fetchAvailableRides();
       fetchMyJobs();
-      fetchDriverStats(); 
+      fetchDriverStats();
     });
 
     socket.on('rideCancelledByRider', () => {
       fetchAvailableRides();
       fetchMyJobs();
       fetchDriverStats();
-      setLiveAlert("🚫 Alert: A passenger cancelled their trip.");
+      setLiveAlert('🚫 Alert: A passenger cancelled their trip.');
       setTimeout(() => setLiveAlert(null), 7000);
     });
 
-    return () => socket.disconnect();
-  }, []);
+    // Clean up: remove the specific listeners and then disconnect
+    return () => {
+      socket.off('connect');
+      socket.off('newRideRequest');
+      socket.off('rideUpdated');
+      socket.off('rideCancelledByRider');
+      socket.disconnect();
+      window._driverSocket = null;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Effect 2: Vehicle room join (re-runs whenever driverProfile changes) ─────
+  // By isolating this emit into its own effect we guarantee it runs AFTER
+  // `driverProfile` has been set, eliminating the race condition where the
+  // profile fetch hadn't completed before the first joinVehicleRoom attempt.
+  useEffect(() => {
+    const socket = window._driverSocket;
+    if (!socket) return;                          // socket not yet initialised
+    if (!driverProfile || !driverProfile.vehicleType) return; // profile not ready
+
+    // Sanitise casing: trim whitespace but preserve original casing (e.g. 'Car', 'Auto')
+    const vehicleType = driverProfile.vehicleType.trim();
+
+    socket.emit('joinVehicleRoom', { vehicleType });
+    console.log('Emitted join room for:', vehicleType);
+  }, [driverProfile]);
 
   const fetchAvailableRides = async () => {
   const token = localStorage.getItem('token');

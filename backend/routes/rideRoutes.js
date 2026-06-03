@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Ride = require('../models/Ride');
 const User = require('../models/User'); 
+const Driver = require('../models/Driver');
 const protect = require('../middleware/authMiddleware');
 
 // ==========================================
@@ -41,9 +42,22 @@ router.post('/book', protect, async (req, res) => {
         
         await newRide.save();
 
-        // Notify drivers via Socket.io
+        // ── Only notify drivers in the matching vehicle-type room ──────────
         const io = req.app.get('io');
-        if (io) io.emit('newRideAlert', newRide);
+        if (io) {
+            // Populate rider info so the driver card shows passenger name
+            const populatedRide = await Ride.findById(newRide._id)
+                .populate('user', 'username name phone');
+
+            // Debug: confirm the exact room being targeted before every emission.
+            // Compare this value against the 'SOCKET JOIN EVENT' server log to
+            // instantly catch any casing mismatch (e.g. 'car' vs 'Car').
+            console.log('EMITTING LIVE RIDE to room:', `vehicle_${populatedRide.vehicleType}`);
+
+            // Target only the room for this specific vehicle type (e.g. vehicle_Car, vehicle_Auto, vehicle_Bike)
+            // Drivers self-join these rooms on dashboard mount via the 'joinVehicleRoom' socket event
+            io.to(`vehicle_${populatedRide.vehicleType}`).emit('newRideRequest', populatedRide);
+        }
 
         res.status(201).json({ message: 'Ride booked successfully!', ride: newRide });
     } catch (error) { 
@@ -62,7 +76,7 @@ router.get('/my-rides', protect, async (req, res) => {
             user: activeUserId, 
             riderClearedHistory: { $ne: true } 
         })
-        .populate('driver', 'username name phone averageRating vehicle profilePicture') 
+        .populate('driver', 'username name phone averageRating vehicle vehicleNumber vehicleType profilePicture') 
         .sort({ createdAt: -1 });
         
         res.status(200).json({ rides });
@@ -77,7 +91,26 @@ router.get('/my-rides', protect, async (req, res) => {
 // ==========================================
 router.get('/available', protect, async (req, res) => {
     try {
-        const rides = await Ride.find({ status: 'pending' }).sort({ createdAt: -1 });
+        const activeUserId = req.user.userId || req.user.id || req.user._id;
+
+        // ── APPROVAL GATE ─────────────────────────────────────────────
+        const driver = await Driver.findById(activeUserId).select('isApproved vehicleType');
+        if (!driver || !driver.isApproved) {
+            return res.status(403).json({
+                message: '🔒 Your account is pending admin approval. You cannot view or accept rides until an administrator activates your account.'
+            });
+        }
+        // ─────────────────────────────────────────────────────────────
+
+        // FALLBACK FIX: Filter by the driver's own vehicleType so an Auto
+        // driver who refreshes does NOT see Car rides (and vice versa).
+        // This mirrors exactly what the Socket.io room-based dispatch does.
+        const query = { status: 'pending' };
+        if (driver.vehicleType) {
+            query.vehicleType = driver.vehicleType.trim();
+        }
+
+        const rides = await Ride.find(query).sort({ createdAt: -1 });
         res.status(200).json({ rides });
     } catch (error) { res.status(500).json({ message: 'Server error' }); }
 });
@@ -88,6 +121,16 @@ router.get('/available', protect, async (req, res) => {
 router.get('/my-jobs', protect, async (req, res) => {
     try {
         const activeUserId = req.user.userId || req.user.id || req.user._id;
+
+        // ── APPROVAL GATE ─────────────────────────────────────────────
+        const driver = await Driver.findById(activeUserId).select('isApproved');
+        if (!driver || !driver.isApproved) {
+            return res.status(403).json({
+                message: '🔒 Your account is pending admin approval. You cannot view or accept rides until an administrator activates your account.'
+            });
+        }
+        // ─────────────────────────────────────────────────────────────
+
         const rides = await Ride.find({ 
             driver: activeUserId, 
             status: { $in: ['accepted', 'arrived', 'in-progress', 'waiting-at-stop'] } 
@@ -251,6 +294,14 @@ router.put('/:id/:action', protect, async (req, res) => {
         if (!ride) return res.status(404).json({ message: 'Ride not found' });
 
         if (action === 'accept') { 
+            // ── APPROVAL GATE ─────────────────────────────────────────
+            const driverDoc = await Driver.findById(activeUserId).select('isApproved');
+            if (!driverDoc || !driverDoc.isApproved) {
+                return res.status(403).json({
+                    message: '🔒 Your account is pending admin approval. You cannot accept rides until an administrator activates your account.'
+                });
+            }
+            // ─────────────────────────────────────────────────────────
             ride.driver = activeUserId; 
             ride.status = 'accepted'; 
         } 
@@ -281,7 +332,8 @@ router.put('/:id/:action', protect, async (req, res) => {
         await ride.save();
         
         // 💡 Populating the driver details before emitting and returning
-        await ride.populate('driver', 'username name phone averageRating vehicle profilePicture');
+        await ride.populate('driver', 'username name phone averageRating vehicle vehicleNumber vehicleType profilePicture');
+
 
         const io = req.app.get('io');
         if (io) io.emit('rideUpdated', ride);
